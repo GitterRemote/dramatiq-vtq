@@ -13,7 +13,7 @@ class VtqConsumer(dramatiq.Consumer):
         self.logger = dramatiq.logging.get_logger(__name__, type(self))
 
     def ack(self, message: Message):
-        print(f"[VtqBroker] ack {message.message_id}")
+        self.logger.debug(f"ack {message.message_id}")
 
         # A better solution is to add a message.retrying condition in _ConsumerThread.post_process_message, and then call Consumer.retry method instead of the Consumer.ack method. Then the Retries Middleware has to set the message to be retrying instead of enqueue a new message.
         if message_mod.is_retrying(message):
@@ -25,13 +25,13 @@ class VtqConsumer(dramatiq.Consumer):
             raise Exception(f"[VtqConsumer] ack error for {message.message_id}")
 
     def nack(self, message: Message):
-        print(f"[VtqBroker] nack {message.message_id}")
+        self.logger.debug(f"nack {message.message_id}")
         error_message = self._get_error_message(message)
         if not self.task_queue.nack(message_mod.get_msg_id(message), error_message):
             raise Exception(f"[VtqConsumer] nack error for {message.message_id}")
 
     def retry(self, message: Message, delay=0):
-        print(f"[VtqBroker] retry {message.message_id}")
+        self.logger.debug(f"retry {message.message_id}")
         rv = self.task_queue.retry(
             task_id=message_mod.pop_msg_id(message),
             delay_millis=delay,
@@ -57,7 +57,7 @@ class VtqConsumer(dramatiq.Consumer):
         return str(exc)
 
     def requeue(self, messages: Iterable[Message]):
-        print("[VtqBroker] requeue messages")
+        self.logger.debug("requeue messages")
         error_count = 0
         for message in messages:
             if not self.task_queue.requeue(message_mod.get_msg_id(message)):
@@ -76,5 +76,5 @@ class VtqConsumer(dramatiq.Consumer):
         message = Message.decode(task.data)
         message_mod.set_msg_id(message, task.id)
         message_mod.set_retries(message, retries=task.meta.retries)
-        print(f"[VtqBroker] receive {message.message_id}")
+        self.logger.debug(f"receive {message.message_id}")
         return MessageProxy(message)
